@@ -40,20 +40,20 @@ public class UserController {
         return userService.createUser(userRequest);
     }
 
-    @WebServlet("/example")
-    public class ExampleServlet extends HttpServlet {
-        @Override
-        protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, InaccessibleObjectException, IOException {
-            String paramValue = request.getParameter("paramName");
-            String headerValue = request.getHeader("HeaderName");
-
-            request.setAttribute("attributeName", "attributeValue");
-
-            // Forward the request to another resource
-            RequestDispatcher dispatcher = request.getRequestDispatcher("/anotherResource");
-            dispatcher.forward(request, response);
-        }
-    }
+//    @WebServlet("/example")
+//    public class ExampleServlet extends HttpServlet {
+//        @Override
+//        protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, InaccessibleObjectException, IOException {
+//            String paramValue = request.getParameter("paramName");
+//            String headerValue = request.getHeader("HeaderName");
+//
+//            request.setAttribute("attributeName", "attributeValue");
+//
+//            // Forward the request to another resource
+//            RequestDispatcher dispatcher = request.getRequestDispatcher("/anotherResource");
+//            dispatcher.forward(request, response);
+//        }
+//    }
 
     @PostMapping("/loginUser")
     public LoginResponse loginUser(@RequestBody @Valid LoginRequest loginRequest) {
