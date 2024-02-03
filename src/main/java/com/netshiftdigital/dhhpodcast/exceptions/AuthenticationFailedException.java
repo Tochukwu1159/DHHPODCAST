@@ -1,0 +1,6 @@
+package com.netshiftdigital.dhhpodcast.exceptions;
+public class AuthenticationFailedException extends RuntimeException{
+    public AuthenticationFailedException(String message){
+        super(message);
+    }
+}
