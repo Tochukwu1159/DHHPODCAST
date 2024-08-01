@@ -1,30 +1,33 @@
 package com.netshiftdigital.dhhpodcast.controllers;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.netshiftdigital.dhhpodcast.models.Subscription;
 import com.netshiftdigital.dhhpodcast.models.SubscriptionPlans;
+import com.netshiftdigital.dhhpodcast.payloads.requests.PaystackWebhookPayload;
 import com.netshiftdigital.dhhpodcast.payloads.requests.SubscriptionPlanDto;
-import com.netshiftdigital.dhhpodcast.payloads.responses.*;
+import com.netshiftdigital.dhhpodcast.repositories.SubscriptionRepository;
 import com.netshiftdigital.dhhpodcast.service.SubscriptionPlanService;
-import com.netshiftdigital.dhhpodcast.service.SubscriptionService;
+import com.netshiftdigital.dhhpodcast.payloads.responses.*;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
-    @RequestMapping("/api/v1/subscription-plans")
+    @RequestMapping("/api/v1/podcast/subscription-plans/")
     public class SubscriptionPlanController {
 
         private final SubscriptionPlanService subscriptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SubscriptionRepository subscriptionRepository;
 
-        @PostMapping
-        public ResponseEntity<SubscriptionPlans> createSubscriptionPlan(@RequestBody SubscriptionPlanDto subscriptionPlan) {
+    @PostMapping
+        public ResponseEntity<SubscriptionPlans> createSubscriptionPlan(@RequestBody @Valid SubscriptionPlanDto subscriptionPlan) {
             SubscriptionPlans createdPlan = subscriptionService.createSubscriptionPlan(subscriptionPlan);
             return new ResponseEntity<>(createdPlan, HttpStatus.CREATED);
         }
@@ -62,12 +65,12 @@ import java.util.List;
     }
 
     @PutMapping("/{idOrCode}")
-    public void updatePlan(@PathVariable String idOrCode, @RequestParam String updatedName) {
+    public void updatePlan(@PathVariable String idOrCode, @RequestParam @Valid String updatedName) {
         subscriptionService.updatePlan(idOrCode, updatedName);
     }
 
     @GetMapping("/{idOrCode}")
-    public ResponseEntity<SingleSubscriptionDto> getSubscriptionByIdOrCode(@PathVariable String idOrCode) {
+    public ResponseEntity<SingleSubscriptionDto> getSubscriptionByIdOrCode(@PathVariable @Valid String idOrCode) {
         SingleSubscriptionDto subscription = subscriptionService.getSubscriptionByIdOrCode(idOrCode);
 
         if (subscription != null) {
@@ -84,23 +87,29 @@ import java.util.List;
     }
 
 
-    @PostMapping("/webhook")
-    public ResponseEntity<String> handleWebhook(@RequestBody String payload) {
+    @PostMapping("/paystack-webhook")
+    public ResponseEntity<String> handleWebhook(@RequestBody @Valid PaystackWebhookPayload payload) {
         try {
-            // Parse JSON payload
-            JsonNode payloadJson = objectMapper.readTree(payload);
-            String event = payloadJson.get("event").asText();
-            JsonNode eventData = payloadJson.get("data");
+            String event = payload.getEvent();
 
             if ("subscription.create".equals(event)) {
-                handleSubscriptionCreate(eventData);
+                handleSubscriptionEvent(payload);
             } else if ("subscription.disable".equals(event)) {
-                handleSubscriptionDisable(eventData);
-            } else if ("other_event".equals(event)) {
-                // Handle other events as needed
+                handleSubscriptionDisableEvent(payload);
+            }  else if ("invoice".equals(payload.getEvent())) {
+            handleInvoiceEvent(payload);
+        } else if ("customer".equals(payload.getEvent())) {
+            handleCustomerEvent(payload);
+        } else if ("payment".equals(payload.getEvent())) {
+            handlePaymentEvent(payload);
+        } else if ("transfer".equals(payload.getEvent())) {
+            handleTransferEvent(payload);
+        } else if ("refund".equals(payload.getEvent())) {
+                handleRefundEvent(payload);
             }
+
             System.out.println("Received Paystack webhook event: " + event);
-            System.out.println("Webhook data: " + eventData);
+            System.out.println("Webhook data: " + payload);
             return new ResponseEntity<>("Webhook received successfully", HttpStatus.OK);
         } catch (Exception e) {
             e.printStackTrace();
@@ -108,29 +117,69 @@ import java.util.List;
         }
     }
 
+    private void handleSubscriptionEvent(PaystackWebhookPayload payload) {
+        String subscriptionCode = payload.getData().getSubscriptionCode();
+        String newStatus = payload.getData().getStatus();
 
-    private void handleSubscriptionCreate(JsonNode eventData) {
-        String subscriptionCode = eventData.get("subscription_code").asText();
-        String customerCode = eventData.get("customer").get("customer_code").asText();
+        // Update your local database with the new subscription status
+        Optional<Subscription> subscriptionOptional = subscriptionRepository.findBySubscriptionCode(subscriptionCode);
 
-        // Your logic to handle subscription creation
-        System.out.println("Handling subscription create event...");
-        System.out.println("Subscription Code: " + subscriptionCode);
-        System.out.println("Customer Code: " + customerCode);
+        if (subscriptionOptional.isPresent()) {
+            Subscription subscription = subscriptionOptional.get();
+            subscription.setStatus(newStatus);
+            subscriptionRepository.save(subscription);
 
-        // Update your system with the subscription information...
+            System.out.println("Subscription status updated: " + subscription);
+        } else {
+            System.out.println("Subscription not found for code: " + subscriptionCode);
+        }
     }
 
-    private void handleSubscriptionDisable(JsonNode eventData) {
-        // Extract subscription details and update your system
-        String subscriptionCode = eventData.get("subscription_code").asText();
-        String customerCode = eventData.get("customer").get("customer_code").asText();
+    private void handleSubscriptionDisableEvent(PaystackWebhookPayload payload) {
+        // Extract relevant information from the payload
+        String subscriptionCode = payload.getData().getSubscriptionCode();
+        String newStatus = payload.getData().getStatus();
 
-        // Your logic to handle subscription disable
-        System.out.println("Handling subscription disable event...");
-        System.out.println("Subscription Code: " + subscriptionCode);
-        System.out.println("Customer Code: " + customerCode);
+        // Update your local database with the new subscription status
+        Optional<Subscription> subscriptionOptional = subscriptionRepository.findBySubscriptionCode(subscriptionCode);
 
-        // Update your system to reflect the disabled subscription...
+        if (subscriptionOptional.isPresent()) {
+            Subscription subscription = subscriptionOptional.get();
+            subscription.setStatus("disabled");
+            subscriptionRepository.save(subscription);
+
+            System.out.println("Subscription status updated for disable event: " + subscription);
+        } else {
+            System.out.println("Subscription not found for code: " + subscriptionCode);
+        }
+    }
+
+
+    private void handleSubscriptionEnableEvent(PaystackWebhookPayload payload) {
+        // Implement logic for subscription enable event
+    }
+
+    private void handleInvoiceEvent(PaystackWebhookPayload payload) {
+        // Implement logic for invoice event
+    }
+
+    private void handleCustomerEvent(PaystackWebhookPayload payload) {
+        // Implement logic for customer event
+    }
+
+    private void handlePaymentEvent(PaystackWebhookPayload payload) {
+        // Implement logic for payment event
+    }
+
+    private void handleTransferEvent(PaystackWebhookPayload payload) {
+        // Implement logic for transfer event
+    }
+
+    private void handleRefundEvent(PaystackWebhookPayload payload) {
+        // Implement logic for refund event
+    }
+
+    private void handleOtherEvent(PaystackWebhookPayload payload) {
+        // Implement logic for other event types
     }
 }

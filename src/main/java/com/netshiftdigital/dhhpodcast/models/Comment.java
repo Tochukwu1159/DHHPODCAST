@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -14,26 +15,17 @@ import java.time.LocalDateTime;
 @Table(name = "comment")
 @Entity
 @Builder
-public class Comment {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
-    private Long id;
+public class Comment extends BaseEntity {
 
     @ManyToOne
-    @JsonIgnore
-    @ToString.Exclude
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
+    @JoinColumn(name = "profile_id", nullable = false)
+    private Profile profile;
 
     @ManyToOne
-    @JsonIgnore
+    @JoinColumn(name = "podcast_id")
     private Podcast podcast;
 
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Column(nullable = false)
-    private LocalDateTime timestamp;
 }

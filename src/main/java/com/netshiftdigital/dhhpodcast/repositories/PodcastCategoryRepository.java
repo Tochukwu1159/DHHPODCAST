@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PodcastCategoryRepository extends JpaRepository<PodcastCategory, Long> {
 
-    PodcastCategory findByName(String name);
+    PodcastCategory findByNameIgnoreCase(String name);
 }

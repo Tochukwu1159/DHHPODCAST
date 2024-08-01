@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,28 +19,22 @@ import java.util.List;
     @Table(name = "subscription")
     @Entity
     @Builder
-    public class Subscription {
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        @Column(name = "id", nullable = false)
-        private Long id;
-
-    @OneToOne
-    @JsonIgnore
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-        @ManyToOne
+    public class Subscription extends BaseEntity {
+        @OneToOne
         @JsonIgnore
-        @JoinColumn(name = "podcast_id")
-        private Podcast podcast;
+        @JoinColumn(name = "profile_id", nullable = false)
+        private Profile profile;
         private String subscriptionCode;
         private String emailToken;
+
+        private String subscriptionPlan;
 
         private BigDecimal amount;
         private LocalDateTime nextPaymentDate;
         private String status;
 
         private long plan;
+
 }
 
 

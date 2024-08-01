@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.client.RestTemplate;
@@ -32,8 +33,7 @@ public class SecurityConfig {
     private final JwtFilter jwtRequestFilter;
     private final UserDetailsService userDetailsService;
 
-    @Autowired
-    private AuthEntryPointJwt unauthorizedHandler;
+    private final  CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public JwtFilter authenticationJwtTokenFilter() {
@@ -45,13 +45,15 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors ->cors.configurationSource(corsConfigurationSource()))
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(customAuthenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers(
                                         "/api/v1/users/admin",
                                         "/api/v1/users/subscriber",
                                         "/api/v1/users/loginUser",
+                                "/api/v1/users/reset-passwords",
                                         "/v3/api-docs/**",
                                         "/swagger-ui/**",
                                         "/swagger-resources/**",
@@ -83,6 +85,13 @@ public class SecurityConfig {
 
         return http.build();
     }
+
+
+//
+//    @Bean
+//    public AuthenticationEntryPoint authenticationEntryPoint() {
+//        return new CustomAuthenticationEntryPoint();
+//    }
 
 
     @Bean

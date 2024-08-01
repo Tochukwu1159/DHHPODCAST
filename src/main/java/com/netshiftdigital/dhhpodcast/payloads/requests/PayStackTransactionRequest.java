@@ -3,6 +3,7 @@ package com.netshiftdigital.dhhpodcast.payloads.requests;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +22,7 @@ public class PayStackTransactionRequest {
 
         @Digits(integer = 9, fraction = 0)
         private BigDecimal amount;
-
+        @Email
         private String email;
 
 }

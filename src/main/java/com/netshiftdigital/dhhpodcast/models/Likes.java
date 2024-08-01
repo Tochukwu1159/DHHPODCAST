@@ -3,6 +3,9 @@ package com.netshiftdigital.dhhpodcast.models;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
@@ -10,23 +13,13 @@ import lombok.*;
 @Table(name = "likes")
 @Entity
 @Builder
-public class Likes {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false)
-    private Long id;
-
+public class Likes extends BaseEntity{
 
     @ManyToOne
-    @JsonIgnore
-    @ToString.Exclude
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "profile_id", nullable = false)
+    private Profile profile;
 
     @ManyToOne
-    @JsonIgnore
     @JoinColumn(name = "podcast_id", nullable = false)
     private Podcast podcast;
-
-    // Constructors, getters, and setters
 }

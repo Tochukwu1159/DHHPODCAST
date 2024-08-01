@@ -1,5 +1,6 @@
 package com.netshiftdigital.dhhpodcast.payloads.responses;
 
+import com.netshiftdigital.dhhpodcast.utils.Roles;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,4 +15,6 @@ public class UserObj {
     private String lastName;
 
     private String email;
+
+    private Roles role;
 }

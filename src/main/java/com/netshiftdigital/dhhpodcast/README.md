@@ -1,7 +1,7 @@
 # Online Bookstore API
 
 ## Overview
-This project implements a RESTful API for managing an online bookstore. It is built using Java with the Spring Boot framework, utilizes a relational database for data storage, and includes features for viewing, adding, updating, and deleting books from the store.
+This project implements a RESTful API for a podcast application. It is built using Java with the Spring Boot framework, utilizes a relational database for data storage, and includes features for viewing, adding, updating, and deleting books from the store.
 
 ## Table of Contents
 - [Setup Instructions](#setup-instructions)
@@ -20,7 +20,7 @@ To run the application locally, follow these steps:
 
 1. **Clone the Repository:**
    ```bash
-   git clone https://github.com/your-username/online-bookstore-api.git
+   git clone https://github.com/Tochukwu1159/dhhpodcast-api.git
 Save to grepper
 Navigate to the Project Directory:
 

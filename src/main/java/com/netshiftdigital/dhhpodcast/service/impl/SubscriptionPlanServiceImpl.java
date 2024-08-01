@@ -1,21 +1,18 @@
 package com.netshiftdigital.dhhpodcast.service.impl;
 
+
 import com.netshiftdigital.dhhpodcast.Security.SecurityConfig;
-import com.netshiftdigital.dhhpodcast.exceptions.AuthenticationFailedException;
-import com.netshiftdigital.dhhpodcast.exceptions.BadRequestException;
-import com.netshiftdigital.dhhpodcast.exceptions.CustomInternalServerException;
-import com.netshiftdigital.dhhpodcast.exceptions.ResourceNotFoundException;
+import com.netshiftdigital.dhhpodcast.exceptions.*;
+import com.netshiftdigital.dhhpodcast.models.*;
 import com.netshiftdigital.dhhpodcast.models.Subscription;
-import com.netshiftdigital.dhhpodcast.models.SubscriptionPlans;
-import com.netshiftdigital.dhhpodcast.models.User;
-import com.netshiftdigital.dhhpodcast.payloads.requests.SubscriptionPlanDto;
-import com.netshiftdigital.dhhpodcast.payloads.requests.SubscriptionPlansRequest;
+import com.netshiftdigital.dhhpodcast.payloads.requests.*;
 import com.netshiftdigital.dhhpodcast.payloads.responses.*;
-import com.netshiftdigital.dhhpodcast.repositories.SubscriptionPlanRepository;
-import com.netshiftdigital.dhhpodcast.repositories.SubscriptionRepository;
-import com.netshiftdigital.dhhpodcast.repositories.UserRepository;
+import com.netshiftdigital.dhhpodcast.payloads.responses.PayStackTransactionResponse;
+import com.netshiftdigital.dhhpodcast.repositories.*;
+import com.netshiftdigital.dhhpodcast.service.EmailService;
 import com.netshiftdigital.dhhpodcast.service.PayStackPaymentService;
 import com.netshiftdigital.dhhpodcast.service.SubscriptionPlanService;
+import com.netshiftdigital.dhhpodcast.utils.Constants;
 import com.netshiftdigital.dhhpodcast.utils.SubscriptionPlan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,13 +20,19 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import javax.naming.AuthenticationException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 // SubscriptionService.java
@@ -37,12 +40,17 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
+    private final UserProfileRepository userProfileRepository;
+    private final EmailService emailService;
     private final SubscriptionRepository subscriptionRepository;
 
     @Value("${paystack.api.url}/subscription")
     private String paystackSubscriptionUrl;
     @Value("${paystack.api.url}/plan")
     private String paystackplanurl;
+    @Value("${paystack.api.transaction.url}/initialize")
+    private String paystacktransactionurl;
+
 
     @Value("${paystack.api.url}/subscription/{idOrCode}")
     private String paystackSubscriptionUrlSingle;
@@ -51,20 +59,25 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     private String paystackPlanUrlSingle;
 
 
-    private final  RestClient restClient;
+    private final RestClient restClient;
     private final ModelMapper modelMapper;
 
 
     @Value("${paystack_secret_key}")  // Use the actual property key for your secret key
     private String paystackSecretKey;
 
-    private final  SubscriptionPlanRepository subscriptionPlanRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     private final RestTemplate restTemplate;
     private final UserRepository userRepository;
+    private final SubscriptionPlanRepo subscriptionPlanRepo;
 
-@Override
+    @Override
     public SubscriptionPlans createSubscriptionPlan(SubscriptionPlanDto subscriptionPlan) {
+        Optional<com.netshiftdigital.dhhpodcast.models.SubscriptionPlan> existingPlan = subscriptionPlanRepo.findById(subscriptionPlan.getPlanId());
+        if (existingPlan == null) {
+            throw new PodcastCategoryNotFoundException("Subscription group with Id not found: " + subscriptionPlan.getPlanId());
+        }
 //
 //        HttpHeaders headers = new HttpHeaders();
 //        headers.set("Authorization", "Bearer " + paystackSecretKey);
@@ -72,27 +85,106 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
         // Prepare request body
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("name", subscriptionPlan.getPlanName());
+        requestBody.put("name", existingPlan.get().getName());
         requestBody.put("amount", subscriptionPlan.getAmount() * 100);
         requestBody.put("interval", subscriptionPlan.getInterval());
 
 //        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-      PayStackResponse payStackResponse = restClient.postData(PayStackResponse.class, requestBody, paystackplanurl);
-    System.out.println(payStackResponse + "payStackResponse" );
+        PayStackResponse payStackResponse = restClient.postData(PayStackResponse.class, requestBody, paystackplanurl);
+        System.out.println(payStackResponse + "payStackResponse");
 //        ResponseEntity<PayStackResponse> response = restTemplate.postForEntity(paystackplanurl, requestEntity, PayStackResponse.class);
 //        System.out.println(response + "   new HttpEntity<>(headers),");
 //        if (response.getStatusCode().is2xxSuccessful()) {
 //         PayStackResponse payStackResponse = response.getBody();
-            SubscriptionPlans subscriptionPlans = new SubscriptionPlans();
-            subscriptionPlans.setPaystackPlanCode(payStackResponse.getData().getPlanCode());
-            subscriptionPlans.setPlanId(payStackResponse.getData().getId());
-            subscriptionPlans.setCurrency(payStackResponse.getData().getCurrency());
-            subscriptionPlans.setCreatedTime(LocalDateTime.now());
-            subscriptionPlans.setAmount(subscriptionPlan.getAmount());
-            subscriptionPlans.setName(subscriptionPlan.getPlanName());
-            subscriptionPlans.setIntervals(subscriptionPlan.getInterval());
-            return subscriptionPlanRepository.save(subscriptionPlans);
+        SubscriptionPlans subscriptionPlans = new SubscriptionPlans();
+        subscriptionPlans.setPaystackPlanCode(payStackResponse.getData().getPlanCode());
+        subscriptionPlans.setPlanId(payStackResponse.getData().getId());
+        subscriptionPlans.setCurrency(payStackResponse.getData().getCurrency());
+        subscriptionPlans.setAmount(subscriptionPlan.getAmount());
+        subscriptionPlans.setName(existingPlan.get().getName());
+        subscriptionPlans.setIntervals(subscriptionPlan.getInterval());
+        return subscriptionPlanRepository.save(subscriptionPlans);
     }
+
+    public PayStackTransactionResponse initTransaction(PayStackTransactionRequestDto request) throws Exception {
+        try {
+            // Prepare request body
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("email", request.getEmail());
+            requestBody.put("amount", request.getAmount() * 100);
+
+
+            // Consuming PayStack API using HttpClient
+            PayStackAuthorizationResponse payStackResponse = restClient.postData(PayStackAuthorizationResponse.class, requestBody, paystacktransactionurl);
+
+            if (payStackResponse.isStatus()) {
+                return handleSuccessfulResponse(payStackResponse);
+            } else {
+                handleErrorResponse(payStackResponse);
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new Exception("Failure initializing PayStack transaction");
+        }
+        return null;
+
+    }
+
+    private PayStackTransactionResponse handleSuccessfulResponse(PayStackAuthorizationResponse response) {
+        return new PayStackTransactionResponse(
+                response.getMessage(), response.getData().getAuthorizationUrl(), response.getData().getReference(), response.getData().getAccessCode());
+    }
+
+    private void handleErrorResponse(PayStackAuthorizationResponse response) throws Exception {
+        boolean statusCode = response.isStatus();
+        if (!statusCode) {
+            throw new AuthenticationException("Unauthorized request to PayStack API");
+        } else {
+            throw new Exception("Error occurred while initializing PayStack transaction. HTTP Status Code: " + statusCode);
+        }
+    }
+
+
+    public PayStackVerification verifyTransaction(String reference) throws Exception {
+        try {
+            // Consuming PayStack API using HttpClient
+            PayStackVerification payStackResponse = restClient.getData(
+                    PayStackVerification.class,
+                    "https://api.paystack.co/transaction/verify/" + reference
+            );
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + paystackSecretKey);
+//            String apiUrl = "https://api.paystack.co/transaction/verify/" + reference;
+//            ResponseEntity<PayStackVerification> responseEntity = restTemplate.exchange(
+//                    apiUrl,
+//                    HttpMethod.GET,
+//                    new HttpEntity<>(headers),
+//                    PayStackVerification.class
+//            );
+
+            if (payStackResponse.isStatus()) {
+                return payStackResponse;
+            } else {
+                handleVerificationErrorResponse(payStackResponse);
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            throw new Exception("Error occurred while verifying PayStack transaction");
+        }
+        return null;
+    }
+
+
+    private void handleVerificationErrorResponse(PayStackVerification response) throws Exception {
+        throw new Exception(
+                String.format("Error occurred while verifying PayStack transaction. Status: %s",response.isStatus())
+        );
+    }
+
+
+
 
     @Override
     public List<PayStackResponseObj> getAllSubscriptionPlan() {
@@ -249,8 +341,6 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         // Handle general exceptions
         e.printStackTrace();
     }
-
-    // Return null or handle appropriately based on your requirements
         return null;
 }
 
@@ -260,12 +350,12 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         SubscriptionPlans subscriptionPlan = subscriptionPlanRepository.findByPaystackPlanCode(planId);
         System.out.println(subscriptionPlan + "  subscriptionPlan");
         SubscriptionPlansRequest entity = modelMapper.map(subscriptionPlan, SubscriptionPlansRequest.class);
-        SubscriptionResponseDto responseDto = callPaystackApi(entity);
+        SubscriptionResponseDto responseDto = callPayStackApi(entity);
 
         return responseDto;
     }
 
-    private SubscriptionResponseDto callPaystackApi(SubscriptionPlansRequest subscriptionPlan) {
+    private SubscriptionResponseDto callPayStackApi(SubscriptionPlansRequest subscriptionPlan) {
         String email = SecurityConfig.getAuthenticatedUserEmail();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + paystackSecretKey);
@@ -287,13 +377,14 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
             if (responseEntity.getStatusCode().is2xxSuccessful()) {
                 SubscriptionResponseDto responseDto = responseEntity.getBody();
                 Optional<User> suscribedUser = userRepository.findByEmail(email);
+                Profile profile = userProfileRepository.findByUser(suscribedUser.get());
+
                 SubscriptionPlans suscribedPlan = subscriptionPlanRepository.findByPlanId(responseDto.getData().getPlan());
-                System.out.println(suscribedPlan + "plan user");
-                suscribedUser.get().setSubscriptionPlan(suscribedPlan);
-                userRepository.save(suscribedUser.get());
+
                 Subscription userSubscription = new Subscription();
-                userSubscription.setUser(suscribedUser.get());
+                userSubscription.setProfile(profile);
                 userSubscription.setSubscriptionCode(responseDto.getData().getSubscriptionCode());
+                userSubscription.setSubscriptionPlan(suscribedPlan.getName());
                 userSubscription.setNextPaymentDate(responseDto.getData().getNextPaymentDate());
                 userSubscription.setAmount(responseDto.getData().getAmount());
                 userSubscription.setPlan(responseDto.getData().getPlan());
@@ -324,4 +415,31 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     }
 
 
-}
+    @Scheduled(cron = "0 0 8 * * ?") // Run at 8 AM every day
+    public void sendSubscriptionReminders() {
+        List<Subscription> subscriptions = subscriptionRepository.findAll();
+
+        for (Subscription subscription : subscriptions) {
+            LocalDate today = LocalDate.now();
+            LocalDate nextPaymentDate = subscription.getNextPaymentDate().toLocalDate();
+            long daysUntilExpiration = ChronoUnit.DAYS.between(today, nextPaymentDate);
+
+            if (daysUntilExpiration == 5 || daysUntilExpiration == 7 || daysUntilExpiration == 3 || daysUntilExpiration == 0) {
+                String subject = "Subscription Expiration Reminder";
+                String message = "Your subscription is expiring in " + daysUntilExpiration + " days.";
+                String email = subscription.getProfile().getUser().getEmail();
+                EmailDetails emailDetails = new EmailDetails();
+                emailDetails.setRecipient(email);
+                emailDetails.setSubject(subject);
+                emailDetails.setMessageBody(message);
+                emailService.sendEmailAlert(emailDetails);
+            }
+
+            if (daysUntilExpiration <= 0) {
+                subscription.setSubscriptionPlan("BASIC");
+            }
+        }
+        subscriptionRepository.saveAll(subscriptions);
+    }
+    }
+
