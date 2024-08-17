@@ -3,6 +3,7 @@ import com.netshiftdigital.dhhpodcast.payloads.requests.EmailDetails;
 import com.netshiftdigital.dhhpodcast.service.EmailService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,52 +13,45 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
+
+    private final JavaMailSender javaMailSender;
     @Autowired
-    private  JavaMailSender javaMailSender;
+    private SpringTemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String sendEmail;
 
     @Override
-    public void sendEmailAlert(EmailDetails emailDetails) {
-        try {
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            mailMessage.setFrom(sendEmail);
-            mailMessage.setTo(emailDetails.getRecipient());
-            mailMessage.setText(emailDetails.getMessageBody());
-            mailMessage.setSubject(emailDetails.getSubject());
-            javaMailSender.send(mailMessage);
-            System.out.println("mail send successfully");
-        } catch (MailException e) {
-            log.info("mail exception {}", e.getMessage());
-            throw new RuntimeException(e.getMessage());
-        }
-    }
+    public void sendHtmlEmail(EmailDetails emailDetails) throws MessagingException {
+        MimeMessage message = javaMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, StandardCharsets.UTF_8.name());
 
-    @Override
-    public void sendEmailWithAttachment(EmailDetails emailDetails) {
-        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-        MimeMessageHelper mimeMessageHelper;
         try {
-            mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
-            mimeMessageHelper.setFrom(sendEmail);
-            mimeMessageHelper.setTo(emailDetails.getRecipient());
-            mimeMessageHelper.setText(emailDetails.getMessageBody());
-            mimeMessageHelper.setSubject(emailDetails.getSubject());
+            helper.setTo(emailDetails.getRecipient());
+            helper.setSubject(emailDetails.getSubject());
 
-            FileSystemResource file = new FileSystemResource(new File(emailDetails.getAttachment()));
-            mimeMessageHelper.addAttachment(file.getFilename(), file);
-            javaMailSender.send(mimeMessage);
+            // Process the Thymeleaf template with the provided model
+            Context context = new Context();
+            context.setVariables(emailDetails.getModel());
+            String htmlContent = templateEngine.process(emailDetails.getTemplateName(), context);
+
+            helper.setText(htmlContent, true);
+            javaMailSender.send(message);
+            System.out.println("Email sent successfully.");
         } catch (MessagingException e) {
-            throw new RuntimeException(e.getMessage());
-
+            System.err.println("Error sending email: " + e.getMessage());
         }
     }
+
 
 }

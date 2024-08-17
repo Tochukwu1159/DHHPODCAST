@@ -179,11 +179,9 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     private void handleVerificationErrorResponse(PayStackVerification response) throws Exception {
         throw new Exception(
-                String.format("Error occurred while verifying PayStack transaction. Status: %s",response.isStatus())
+                String.format("Error occurred while verifying PayStack transaction. Status: %s", response.isStatus())
         );
     }
-
-
 
 
     @Override
@@ -306,7 +304,6 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     }
 
 
-
     @Override
     public SingleSubscriptionDto getSubscriptionByIdOrCode(String idOrCode) {
         RestTemplate restTemplate = new RestTemplate();
@@ -317,32 +314,32 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         String apiUrl = paystackSubscriptionUrlSingle.replace("{idOrCode}", idOrCode);
         System.out.println(apiUrl + "  api url");
         try {
-        ResponseEntity<SingleSubscriptionDto> responseEntity = restTemplate.exchange(
-                apiUrl,
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                SingleSubscriptionDto.class
-        );
+            ResponseEntity<SingleSubscriptionDto> responseEntity = restTemplate.exchange(
+                    apiUrl,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    SingleSubscriptionDto.class
+            );
 //        return  restClient.getData(SingleSubscriptionDto.class, apiUrl);
             System.out.println(responseEntity);
 
-        if (responseEntity.getStatusCode() == HttpStatus.OK) {
-            SingleSubscriptionDto subscriptionDto = responseEntity.getBody();
+            if (responseEntity.getStatusCode() == HttpStatus.OK) {
+                SingleSubscriptionDto subscriptionDto = responseEntity.getBody();
 
-            return subscriptionDto;
-        } else {
-            // Handle non-OK status code, log, throw exception, etc.
-            System.err.println("Error: " + responseEntity.getStatusCode());
+                return subscriptionDto;
+            } else {
+                // Handle non-OK status code, log, throw exception, etc.
+                System.err.println("Error: " + responseEntity.getStatusCode());
+            }
+        } catch (HttpClientErrorException e) {
+            // Handle exceptions (e.g., 4xx errors)
+            System.err.println("HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+        } catch (Exception e) {
+            // Handle general exceptions
+            e.printStackTrace();
         }
-    } catch (HttpClientErrorException e) {
-        // Handle exceptions (e.g., 4xx errors)
-        System.err.println("HTTP Error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
-    } catch (Exception e) {
-        // Handle general exceptions
-        e.printStackTrace();
-    }
         return null;
-}
+    }
 
 
     @Override
@@ -366,7 +363,7 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         requestBody.put("customer", email);
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
         System.out.println(requestEntity);
-        try{
+        try {
             // Make API call to Paystack to create subscription
             ResponseEntity<SubscriptionResponseDto> responseEntity = restTemplate.postForEntity(
                     paystackSubscriptionUrl,
@@ -395,18 +392,18 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
             } else {
                 throw new RuntimeException("Failed to create subscription. Paystack API returned an error.");
             }
-        }catch (HttpClientErrorException.BadRequest e){
+        } catch (HttpClientErrorException.BadRequest e) {
             log.error(e.getMessage(), e);
             System.out.println(e.getMessage());
-            throw  new BadRequestException("This subscription is already in place");
-        }catch (HttpClientErrorException.NotFound e){
+            throw new BadRequestException("This subscription is already in place");
+        } catch (HttpClientErrorException.NotFound e) {
             log.error(e.getMessage(), e);
             System.out.println(e.getMessage());
-            throw  new ResourceNotFoundException("A customer with the specified email or code was not found");
-        }catch (HttpClientErrorException.Unauthorized e){
+            throw new ResourceNotFoundException("A customer with the specified email or code was not found");
+        } catch (HttpClientErrorException.Unauthorized e) {
             log.error(e.getMessage(), e);
             throw new AuthenticationFailedException("Invalid token");
-        }catch (Exception e){
+        } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new CustomInternalServerException("Internal server error");
         }
@@ -418,28 +415,47 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     @Scheduled(cron = "0 0 8 * * ?") // Run at 8 AM every day
     public void sendSubscriptionReminders() {
         List<Subscription> subscriptions = subscriptionRepository.findAll();
+        LocalDate today = LocalDate.now();
 
         for (Subscription subscription : subscriptions) {
-            LocalDate today = LocalDate.now();
             LocalDate nextPaymentDate = subscription.getNextPaymentDate().toLocalDate();
             long daysUntilExpiration = ChronoUnit.DAYS.between(today, nextPaymentDate);
 
             if (daysUntilExpiration == 5 || daysUntilExpiration == 7 || daysUntilExpiration == 3 || daysUntilExpiration == 0) {
                 String subject = "Subscription Expiration Reminder";
                 String message = "Your subscription is expiring in " + daysUntilExpiration + " days.";
-                String email = subscription.getProfile().getUser().getEmail();
-                EmailDetails emailDetails = new EmailDetails();
-                emailDetails.setRecipient(email);
-                emailDetails.setSubject(subject);
-                emailDetails.setMessageBody(message);
-                emailService.sendEmailAlert(emailDetails);
-            }
 
-            if (daysUntilExpiration <= 0) {
-                subscription.setSubscriptionPlan("BASIC");
+                // Check if user and email exist
+                String email = subscription.getProfile() != null && subscription.getProfile().getUser() != null
+                        ? subscription.getProfile().getUser().getEmail()
+                        : null;
+
+                if (email != null) {
+                    Map<String, Object> model = new HashMap<>();
+                    model.put("expiration", message);
+
+                    EmailDetails emailDetails = EmailDetails.builder()
+                            .recipient(email)
+                            .subject(subject)
+                            .templateName("email-template")
+                            .model(model)
+                            .build();
+
+                    try {
+                        emailService.sendHtmlEmail(emailDetails);
+                    } catch (Exception e) {
+                        // Log the exception instead of throwing
+                        System.err.println("Failed to send the email to " + email + ": " + e.getMessage());
+                    }
+                }
+
+                if (daysUntilExpiration <= 0) {
+                    subscription.setSubscriptionPlan("BASIC");
+                }
             }
         }
         subscriptionRepository.saveAll(subscriptions);
     }
-    }
+
+}
 

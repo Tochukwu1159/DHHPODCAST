@@ -24,6 +24,7 @@ import com.netshiftdigital.dhhpodcast.service.UserService;
 import com.netshiftdigital.dhhpodcast.utils.Constants;
 import com.netshiftdigital.dhhpodcast.utils.Roles;
 import com.netshiftdigital.dhhpodcast.payloads.requests.UserRequestDto;
+import jakarta.mail.MessagingException;
 import jakarta.persistence.EntityExistsException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -42,9 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -84,7 +83,7 @@ public class UserServiceImpl implements UserService
 
 
     @Override
-    public UserResponse createAdmin(UserRequestDto userRequest) {
+    public UserResponse createAdmin(UserRequestDto userRequest) throws MessagingException {
         Optional<User> student = userRepository.findByEmail(userRequest.getEmail());
 
         if (student.isPresent()) {
@@ -132,9 +131,10 @@ public class UserServiceImpl implements UserService
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(savedUser.getEmail())
                 .subject("ACCOUNT CREATION")
-                .messageBody("Congratulations! Your Account Has Been Successfully Created as Admin.\nYour Account Details:\nAccount Name: " + savedUser.getFirstName() + " "+ savedUser.getLastName())
+                .templateName("email-template-admin")
+                .model(Map.of("name", savedUser.getFirstName() + " " + savedUser.getLastName()))
                 .build();
-        emailService.sendEmailAlert(emailDetails);
+        emailService.sendHtmlEmail(emailDetails);
 
 
         return UserResponse.builder()
@@ -146,7 +146,7 @@ public class UserServiceImpl implements UserService
     }
 
     @Override
-    public UserResponse createUser(UserRequestDto userRequest) {
+    public UserResponse createUser(UserRequestDto userRequest) throws MessagingException {
         Optional<User> student = userRepository.findByEmail(userRequest.getEmail());
 
         if (student.isPresent()) {
@@ -192,12 +192,18 @@ public class UserServiceImpl implements UserService
         );
         confirmationTokenService.saveConfirmationToken(confirmationToken);
 
+        Map<String, Object> model = new HashMap<>();
+        model.put("token", "http://localhost:8080/api/users/verify?token=" + token);
+        model.put("name", savedUser.getFirstName() + " " + savedUser.getLastName());
+
+
         EmailDetails emailDetails = EmailDetails.builder()
                 .recipient(savedUser.getEmail())
                 .subject("ACCOUNT CREATION")
-                .messageBody("Congratulations! Your Account Has Been Successfully Created.\nYour Account Details:\nAccount Name: " + savedUser.getFirstName() + " "+ savedUser.getLastName())
+                .templateName("email-template-user")
+                .model(model)
                 .build();
-        emailService.sendEmailAlert(emailDetails);
+        emailService.sendHtmlEmail(emailDetails);
 
 
         return UserResponse.builder()
@@ -207,19 +213,6 @@ public class UserServiceImpl implements UserService
                 .email(savedUser.getEmail())
                 .build();
     }
-
-//    @Scheduled(fixedRate = 60000)
-//    public void sendEmails() {
-//        List<User> users = userRepository.findAll();
-//        for (User user : users) {
-//
-//            EmailDetails emailDetails = EmailDetails.builder()
-//                    .recipient(user.getEmail())
-//                    .subject("ACCOUNT Active")
-//                    .messageBody("Congratulations! Your Account is Active.\nYour Account Details:\nAccount Name: " + user.getFirstName() + " " + user.getLastName())
-//                    .build();
-//            emailService.sendEmailAlert(emailDetails);
-//        }}
 
     public LoginResponse loginUser(LoginRequest loginRequest) {
         try {
@@ -233,6 +226,10 @@ public class UserServiceImpl implements UserService
 
 //            UserDetails userDetails = loadUserByUsername(loginRequest.getEmail());
             Optional<User> userDetails = userRepository.findByEmail(loginRequest.getEmail());
+
+            if(!userDetails.get().getIsVerified()){
+                throw new UserNotVerifiedException("User is not verified");
+            }
 
             SecurityContextHolder.getContext().setAuthentication(authenticate);
             String token = "Bearer " + jwtUtil.generateToken(loginRequest.getEmail());
@@ -376,13 +373,18 @@ public class UserServiceImpl implements UserService
                 passwordResetTokenRepository.save(passwordResetTokenEntity);
             }
 
+            Map<String, Object> model = new HashMap<>();
+            model.put("token", "http://localhost:8080/api/users/resetPassword?token=" + token);
+
             EmailDetails emailDetails = EmailDetails.builder()
                     .recipient(forgotPasswordRequest.getEmail())
-                    .subject("PASSWORD RESET LINK")
-                    .messageBody("http://localhost:8080/api/users/resetPassword?token=" + token)
+                    .subject("PASSWORD RESET OTP")
+                    .templateName("password-reset-email")
+                    .model(model)
                     .build();
+
             try {
-                emailService.sendEmailAlert(emailDetails);
+                emailService.sendHtmlEmail(emailDetails);
             } catch (Exception e) {
                 throw new EmailSendingException("Failed to send the password reset email "+e);
             }

@@ -5,14 +5,15 @@ import com.netshiftdigital.dhhpodcast.payloads.requests.LoginRequest;
 import com.netshiftdigital.dhhpodcast.payloads.requests.ResetPasswordWithoutToken;
 import com.netshiftdigital.dhhpodcast.payloads.responses.*;
 import com.netshiftdigital.dhhpodcast.payloads.requests.UserRequestDto;
+import jakarta.mail.MessagingException;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 
 public interface UserService
 {
-    UserResponse createAdmin(UserRequestDto userRequest);
-    UserResponse createUser(UserRequestDto userRequest);
+    UserResponse createAdmin(UserRequestDto userRequest) throws MessagingException;
+    UserResponse createUser(UserRequestDto userRequest) throws MessagingException;
 
     LoginResponse loginUser(LoginRequest loginRequest);
 

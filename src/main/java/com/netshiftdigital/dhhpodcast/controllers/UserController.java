@@ -7,6 +7,7 @@ import com.netshiftdigital.dhhpodcast.payloads.requests.ResetPasswordWithoutToke
 import com.netshiftdigital.dhhpodcast.payloads.requests.UserRequestDto;
 import com.netshiftdigital.dhhpodcast.payloads.responses.*;
 import com.netshiftdigital.dhhpodcast.service.UserService;
+import jakarta.mail.MessagingException;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -32,11 +33,11 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/admin")
-    public UserResponse createAdmin(@RequestBody @Valid UserRequestDto userRequest)  {
+    public UserResponse createAdmin(@RequestBody @Valid UserRequestDto userRequest) throws MessagingException {
         return userService.createAdmin(userRequest);
     }
     @PostMapping("/subscriber")
-    public UserResponse createUser(@RequestBody @Valid UserRequestDto userRequest)  {
+    public UserResponse createUser(@RequestBody @Valid UserRequestDto userRequest) throws MessagingException {
         return userService.createUser(userRequest);
     }
 
