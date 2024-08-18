@@ -7,8 +7,8 @@ import lombok.Data;
 
 public class SubscriptionPlanDto {
 
-    @NotBlank(message = "Plan code is mandatory")
-    private String planCode;
+//    @NotBlank(message = "Plan code is mandatory")
+//    private String planCode;
 
     @Min(value = 1, message = "Plan ID must be a positive integer")
     private Long planId;
@@ -21,13 +21,13 @@ public class SubscriptionPlanDto {
     private String interval;
 
     // Getters and Setters (provided for completeness)
-    public String getPlanCode() {
-        return planCode;
-    }
+//    public String getPlanCode() {
+//        return planCode;
+//    }
 
-    public void setPlanCode(String planCode) {
-        this.planCode = planCode;
-    }
+//    public void setPlanCode(String planCode) {
+//        this.planCode = planCode;
+//    }
 
     public Long getPlanId() {
         return planId;
