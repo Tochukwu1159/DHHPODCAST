@@ -19,7 +19,7 @@ import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
-    @RequestMapping("/api/v1/podcast/subscription-plans/")
+@RequestMapping("/api/v1/podcast/subscription-plans")
     public class SubscriptionPlanController {
 
         private final SubscriptionPlanService subscriptionService;

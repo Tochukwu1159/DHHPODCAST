@@ -193,7 +193,7 @@ public class UserServiceImpl implements UserService
         confirmationTokenService.saveConfirmationToken(confirmationToken);
 
         Map<String, Object> model = new HashMap<>();
-        model.put("token", "http://localhost:8080/api/users/verify?token=" + token);
+        model.put("token", "https://dhhpodcast-cau6.onrender.com/api/users/verify?token=" + token);
         model.put("name", savedUser.getFirstName() + " " + savedUser.getLastName());
 
 
@@ -374,7 +374,7 @@ public class UserServiceImpl implements UserService
             }
 
             Map<String, Object> model = new HashMap<>();
-            model.put("token", "http://localhost:8080/api/users/resetPassword?token=" + token);
+            model.put("token", "https://dhhpodcast-cau6.onrender.com/api/users/resetPassword?token=" + token);
 
             EmailDetails emailDetails = EmailDetails.builder()
                     .recipient(forgotPasswordRequest.getEmail())
