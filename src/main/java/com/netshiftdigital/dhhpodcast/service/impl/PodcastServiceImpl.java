@@ -68,6 +68,7 @@ public class PodcastServiceImpl implements PodcastService {
 
             PodcastResponse response = modelMapper.map(savedPodcast, PodcastResponse.class);
             response.setCategoryId(savedPodcast.getCategory().getId());
+
             return response;
         } catch (IOException e) {
             // Handle IO exception
@@ -216,7 +217,7 @@ public class PodcastServiceImpl implements PodcastService {
         response.setTitle(podcast.getTitle());
         response.setCoverPhoto(podcast.getCoverPhoto());
         response.setDescription(podcast.getDescription());
-        response.setLocalDate(podcast.getCreatedDate());
+        response.setCreatedDate(podcast.getCreatedDate());
         response.setFavorite(podcast.isFavorite());
         response.setCategoryId(podcast.getCategory().getId());
 
@@ -234,7 +235,7 @@ public class PodcastServiceImpl implements PodcastService {
         response.setId(podcast.getId());
         response.setTitle(podcast.getTitle());
         response.setCoverPhoto(podcast.getCoverPhoto());
-        response.setLocalDate(podcast.getCreatedDate());
+        response.setCreatedDate(podcast.getCreatedDate());
         response.setDescription(podcast.getDescription());
         response.setFavorite(podcast.isFavorite());
         response.setCategoryId(podcast.getCategory().getId());

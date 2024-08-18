@@ -20,8 +20,7 @@ public class PodcastResponse {
 
     private boolean isFavorite;
 
-
-    private LocalDateTime localDate;
+    private LocalDateTime createdDate;
 
     private int totalViews;
 
