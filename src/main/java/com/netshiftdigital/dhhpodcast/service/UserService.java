@@ -22,7 +22,7 @@ public interface UserService
 
     String logout();
 
-    UserResponse editUserDetails(EditUserRequest editUserDto);
+    UserResponse editUserDetails(EditUserRequest editUserDto );
 
     UserResponse forgotPassword(ForgotPasswordRequest forgotPasswordRequest);
 
